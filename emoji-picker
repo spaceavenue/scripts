@@ -1,0 +1,49 @@
+#!/usr/bin/sh
+
+emoji_ver="17.0.0"
+list_url="https://www.unicode.org/Public/$emoji_ver/emoji/emoji-test.txt"
+parsed_list="$XDG_CACHE_HOME/emoji-list"
+font="Iosevka Etoile:size=16"
+
+# parse list
+if [ ! -f $parsed_list ]; then
+    curl $list_url \
+    | awk -F'# ' 
+        '/; fully-qualified/ {gsub(/E[0-9.]* /, ""); 
+        print $2}' 
+    > $parsed_list
+fi
+
+# selectors
+fuzzel_selector() { fuzzel --dmenu --font "$font" --hide-prompt < $parsed_list; }
+fzf_selector() { fzf < $parsed_list; }
+
+if [ $# -eq 0 ]; then
+    selection=$(fuzzel_selector)
+else
+    selection=""
+fi
+
+# parse options
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --fzf)
+            selection=$(fzf_selector) 
+            break
+            ;;
+        --fuzzel)
+            selection=$(fuzzel_selector)
+            break
+            ;;
+        *)
+            echo "Unknown option: $1"
+            echo "Usage: $0 [--fzf | --fuzzel]"
+            exit 1
+            ;;
+    esac
+done
+
+# exit if cancelled
+[ -z "$selection" ] && exit 0
+
+echo "$selection" | cut -d' ' -f1 | wl-copy --trim-newline

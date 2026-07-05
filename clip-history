@@ -1,0 +1,36 @@
+#!/usr/bin/sh
+
+clip_list=$(cliphist list)
+
+# selectors
+fuzzel_selector() { printf "%s" "$clip_list" | fuzzel -d --prompt "> " --placeholder "Search clipboard..." --with-nth 2;}
+fzf_selector() { printf "%s" "$clip_list" | fzf; }
+
+# set fuzzel as default (if no option given)
+if [ $# -eq 0 ]; then
+    selection=$(fuzzel_selector)
+else
+    selection=""
+fi
+
+# parse options
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --fzf)
+            selection=$(fzf_selector)
+            break
+            ;;
+        --fuzzel)
+            selection=$(fuzzel_selector)
+            break
+            ;;
+        *)
+            echo "Unknown option: $1"
+            echo "Usage: $0 [--fzf | --fuzzel]"
+            exit 1
+            ;;
+    esac
+done
+
+# copy to clipboard
+echo "$selection" | cliphist decode | wl-copy --trim-newline

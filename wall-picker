@@ -1,0 +1,23 @@
+#!/usr/bin/sh
+
+# wallpaper directory
+WALLDIR="$HOME/media/Wallpapers"
+
+set_wallpaper() {
+    WALL="$1"
+    if [ ! -f $WALLDIR/blurred/$WALL ]; then
+        rustblur 3 3.0 $WALLDIR/$WALL $WALLDIR/blurred/$WALL
+    fi
+
+    ln -sf $WALLDIR/$WALL $HOME/.config/current_wallpaper
+    ln -sf $WALLDIR/blurred/$WALL $HOME/.config/current_wallpaper_blurred
+    killall rustbg 
+    ~/.local/bin/setwall
+}
+
+while true; do
+    WALL=$(ls -I "blurred" -I "phone" "$WALLDIR" | fuzzel --dmenu --prompt "Wallpaper > ")
+    [ -z "$WALL" ] && exit 0
+    set_wallpaper "$WALL"
+    exit 0
+done

@@ -1,0 +1,5 @@
+#!/usr/bin/sh
+
+# script to trick gio into thinking xdg-terminal-exec exists in path
+# why install a package when you can hack together a solution :p
+exec footclient "$@"
