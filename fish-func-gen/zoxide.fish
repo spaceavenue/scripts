@@ -44,9 +44,5 @@ end
 complete --command __zoxide_z --no-files --arguments '(__zoxide_z_complete)'
 funcsave __zoxide_z_complete
 
-alias --save cd __zoxide_z
+alias --save z __zoxide_z
 
-function cdl --wraps "__zoxide_z"
-    __zoxide_z $argv[1] && eza -alhbrs modified
-end
-funcsave cdl

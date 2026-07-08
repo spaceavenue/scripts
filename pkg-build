@@ -1,0 +1,126 @@
+#!/usr/bin/env fish
+
+function __confirm
+	set -l pkg_name $argv[1]
+	read -P "build '$pkg_name'? [y/N]: " -l reply
+	string match -qi 'y*' "$reply"
+end
+
+function __nvchecker
+	set -l PKGNAME $argv[1]
+	set -l PKGBUILD $argv[2]
+	set -l nvcheck_config "$XDG_CONFIG_HOME/nvchecker.toml"
+    set NEW_VER (nvget "$PKGNAME" 2>/dev/null)
+	set -l match (nvcmp -c $nvcheck_config 2>/dev/null | string match -r "^$PKGNAME\s+\S+\s+->\s+(\S+)")
+    if test -n "$NEW_VER"
+        echo "new version for $PKGNAME: $NEW_VER"
+        
+        sed -i "s/^pkgver=.*/pkgver=$NEW_VER/" $PKGBUILD
+        sed -i "s/^pkgrel=.*/pkgrel=1/" $PKGBUILD
+        updpkgsums
+        
+        nvtake "$PKGNAME" "$NEW_VER"
+		return 0
+	end
+	return 1
+end
+
+# -----------------------------------------------------
+
+set -l AUR_FORKS (find "$HOME/pkgs/aur-forks" -maxdepth 1 -mindepth 1 -type d 2>/dev/null)
+set -l CUSTOM_PKGS (find "$HOME/pkgs/custom" -maxdepth 1 -mindepth 1 -type d 2>/dev/null)
+set -l REPO "mine"
+
+set -x REVIEW_PAGER less
+if type -q bat
+	set -x REVIEW_PAGER "bat --paging=always --language=PBD"
+else if set -q PAGER
+    set -x REVIEW_PAGER $PAGER
+end
+
+set -l LOG_FILE "$XDG_CACHE_HOME/pkg-build.log"
+nvchecker --file "$XDG_CONFIG_HOME/nvchecker.toml"
+
+echo "--------------------------------------------------"
+echo "updating our packgages"
+for pkg_dir in $CUSTOM_PKGS
+    set -l pkg_name (basename "$pkg_dir")
+
+	if not __confirm $pkg_name
+		echo "skipping $pkg_name"
+		continue
+	end
+
+    echo "~> processing: $pkg_name"
+    
+	pushd "$pkg_dir" >/dev/null
+	
+	if __nvchecker $pkg_name ./PKGBUILD
+		aur build -s -d $REPO &| tee -a $LOG_FILE
+		if test $pipestatus[1] -ne 0
+			echo "failed to build $pkg_name"
+		else
+			echo "added $pkg_name to local repo!"
+		end
+	else
+		echo "no update found for $pkg_name"
+	end
+
+	command rm -rf src pkg 2>/dev/null
+	popd >/dev/null
+end
+
+echo "--------------------------------------------------"
+echo "updating aur forks"
+for pkg_dir in $AUR_FORKS
+	set -l pkg_name (basename "$pkg_dir")
+
+	if not __confirm $pkg_name
+		echo "skipping $pkg_name"
+		continue
+	end
+
+	if not test -d "$pkg_dir"/.git
+		echo "$pkg_dir not a valid git repo"
+		continue
+	end
+
+	echo "~> processing: $pkg_name"
+	
+	set -l OLD_REV (git -C "$pkg_dir" rev-parse HEAD)
+	echo "running git pull --rebase"
+	if not git -C "$pkg_dir" pull --rebase &>>$LOG_FILE
+		echo "git rebase failed in $pkg_dir"
+		continue
+	end
+	set -l NEW_REV (git -C "$pkg_dir" rev-parse HEAD)
+	
+	pushd "$pkg_dir" >/dev/null
+	
+	if test $OLD_REV != $NEW_REV; or __nvchecker $pkg_name ./PKGBUILD
+		echo "--- reviewing PKGBUILD ---"
+		$REVIEW_PAGER PKGBUILD
+		
+		for install_file in (find . -maxdepth 1 \(-name "*.install" -o -name "*.hook"\) 2>/dev/null)
+			set -l file_name (basename $install_file)
+			echo "--- reviewing $file_name ---"
+			$REVIEW_PAGER $install_file
+		end
+		
+		aur build -s -d $REPO &| tee -a $LOG_FILE
+		if test $pipestatus[1] -ne 0
+			echo "failed to build $pkg_name"
+		else
+			echo "added $pkg_name to local repo!"
+		end
+	else
+		echo "no upstream or nvchecker update for $pkg_name"
+	end
+
+	command rm -rf src pkg 2>/dev/null
+	popd >/dev/null
+end
+
+echo "--------------------------------------------------"
+echo "updating standard AUR packages"
+aur sync -u -d $REPO
