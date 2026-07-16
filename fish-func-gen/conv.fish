@@ -4,12 +4,19 @@ alias --save dot-script="git -C ~/.local/bin/"
 alias --save run0="run0 --background="
 alias --save uwu="run0" # :3
 
-alias --save eza="eza --long --all --reverse --sort modified --binary --header --time modified --time-style '+%d %b %y %H:%M' --icons=always --git"
+# add a config file blease
+alias --save eza="eza --long --all --reverse --sort modified --binary --time modified --time-style '+%Y-%m-%d %H:%M' --icons=always --git"
 
-alias --save batman="batman --paging=always"
+# bat-extras eat your heart out
+function batman --wraps 'man'
+	set -lx MANROFFOPT "-c"
+	set -l BAT_OPTS --language=man --paging=always --style=grid
+	set -lx MANPAGER "sh -c 'col -bx | bat $BAT_OPTS'"
+	command man $argv
+end
+funcsave batman
 
-alias --save ncdu="ncdu -t16 --show-percent --exclude-kernfs"
-
+alias --save bless="bat -p --paging=always"
 alias --save bead="bat --line-range :\$argv[1]"
 alias --save bail="bat --line-range -\$argv[1]:"
 
@@ -26,7 +33,4 @@ function zl --wraps "z" --description "cd into a dir and list contents"
 end
 funcsave zl
 
-# only explicitly installed, official packages
-alias --save dump-pkgs="pacman -Qenq | grep -vFx -f (pacman -Slq mine | psub) > ~/documents/arch_install.d/packages.txt"
-
-alias --save pgraph="pacgraph -s -b '#180004' -l '#cba6f7' -t '#ffd1db' -d '#f38ba8' && sed 's/Monospace/Iosevka Etoile/g' -i pacgraph.svg && resvg -w 4000 pacgraph.svg pacgraph.png && rm -frv pacgraph.svg"
+alias --save ytm-album="yt-dlp --format=\"ba[ext=m4a]\"/ba --extract-audio --audio-format m4a --no-overwrites --embed-metadata --embed-thumbnail --ppa \"ThumbnailsConvertor:-lavfi crop=ih:ih\" -o \"%(album)s/%(track_number,playlist_index)s %(title)s.%(ext)s\""

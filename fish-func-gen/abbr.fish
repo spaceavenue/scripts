@@ -19,8 +19,8 @@ function fish_user_key_bindings
 	abbr -a l 'eza'
 	abbr -a cl 'clear; eza'
 
-	abbr -a mv 'mv -v'
-	abbr -a cp 'cp -v'
+	abbr -a mv 'mv -vi'
+	abbr -a cp 'cp -avi'
 
 	abbr -a rm 'rm -Irv'
 	abbr -a rmf 'rm -frv'

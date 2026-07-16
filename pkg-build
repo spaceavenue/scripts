@@ -9,17 +9,22 @@ end
 function __nvchecker
 	set -l PKGNAME $argv[1]
 	set -l PKGBUILD $argv[2]
-	set -l nvcheck_config "$XDG_CONFIG_HOME/nvchecker.toml"
-    set NEW_VER (nvget "$PKGNAME" 2>/dev/null)
-	set -l match (nvcmp -c $nvcheck_config 2>/dev/null | string match -r "^$PKGNAME\s+\S+\s+->\s+(\S+)")
-    if test -n "$NEW_VER"
+	
+	# if not configured in nvchecker, just return 0
+	if not string match -q "*[$PKGNAME]*" (cat "$XDG_CONFIG_HOME"/nvchecker/nvchecker.toml 2>/dev/null)
+        return 0
+    end
+
+	set -l match (nvcmp 2>/dev/null | string match -r "^$PKGNAME\s+\S+\s+->\s+(\S+)")
+    if test (count $match) -ge 2
+		set -l NEW_VER $match[2]
         echo "new version for $PKGNAME: $NEW_VER"
         
         sed -i "s/^pkgver=.*/pkgver=$NEW_VER/" $PKGBUILD
         sed -i "s/^pkgrel=.*/pkgrel=1/" $PKGBUILD
         updpkgsums
         
-        nvtake "$PKGNAME" "$NEW_VER"
+        nvtake "$PKGNAME"
 		return 0
 	end
 	return 1
@@ -38,8 +43,8 @@ else if set -q PAGER
     set -x REVIEW_PAGER $PAGER
 end
 
-set -l LOG_FILE "$XDG_CACHE_HOME/pkg-build.log"
-nvchecker --file "$XDG_CONFIG_HOME/nvchecker.toml"
+set -l LOG_FILE "$XDG_STATE_HOME/pkg-build.log"
+nvchecker
 
 echo "--------------------------------------------------"
 echo "updating our packgages"
@@ -56,7 +61,7 @@ for pkg_dir in $CUSTOM_PKGS
 	pushd "$pkg_dir" >/dev/null
 	
 	if __nvchecker $pkg_name ./PKGBUILD
-		aur build -s -d $REPO &| tee -a $LOG_FILE
+		aur build -d $REPO --margs '-C,-s,-r,--cleanbuild' &| tee -a $LOG_FILE
 		if test $pipestatus[1] -ne 0
 			echo "failed to build $pkg_name"
 		else
@@ -107,7 +112,7 @@ for pkg_dir in $AUR_FORKS
 			$REVIEW_PAGER $install_file
 		end
 		
-		aur build -s -d $REPO &| tee -a $LOG_FILE
+		aur build -d $REPO --margs '-C,-s,-r,--cleanbuild' &| tee -a $LOG_FILE
 		if test $pipestatus[1] -ne 0
 			echo "failed to build $pkg_name"
 		else

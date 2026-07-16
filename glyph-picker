@@ -26,29 +26,44 @@ fi
 fuzzel_selector() { fuzzel --dmenu --prompt "> " --placeholder "Search glyphs..." --font "$font" < $parsed_list; }
 fzf_selector() { fzf < $parsed_list; }
 
-selection=$(fuzzel_selector)
+selector="fuzzel"
+type_mode="false"
 
 # parse options
 while [ $# -gt 0 ]; do
     case "$1" in
         --fzf)
-            selection=$(fzf_selector) 
-            break
+            selector="fzf"
+            shift
             ;;
         --fuzzel)
-            selection=$(fuzzel_selector)
-            break
+            selector="fuzzel"
+            shift
             ;;
+		-w)
+			type_mode=true
+			shift
+			;;
         *)
             echo "Unknown option: $1"
             echo "Usage: $0 [--fzf | --fuzzel]"
             exit 1
             ;;
-    esac
+	esac
 done
+
+if [ "$selector" = "fzf" ]; then
+    selection=$(fzf_selector)
+else
+    selection=$(fuzzel_selector)
+fi
 
 # exit if cancelled
 [ -z "$selection" ] && exit 0
 
-# copy the selection
-echo "$selection" | cut -d' ' -f1 | wl-copy --trim-newline
+if [ "$type_mode" = true ]; then
+	echo "$selection" | cut -d' ' -f1 | tr '\n' ' ' | rustype -
+else
+    echo "$selection" | cut -d' ' -f1 | wl-copy --trim-newline
+fi
+

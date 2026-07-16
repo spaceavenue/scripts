@@ -24,3 +24,8 @@ function ponder
 end
 funcsave ponder
 
+# only explicitly installed, official packages
+alias --save pkg-dump="pacman -Qenq | grep -vf (pacman -Slq mine | psub)"
+
+alias --save pgraph="pacgraph -s -b '#180004' -l '#cba6f7' -t '#ffd1db' -d '#f38ba8' && sed 's/Monospace/Iosevka Etoile/g' -i pacgraph.svg && resvg -w 4000 pacgraph.svg pacgraph.png && rm -frv pacgraph.svg"
+

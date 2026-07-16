@@ -6,31 +6,40 @@ clip_list=$(cliphist list)
 fuzzel_selector() { printf "%s" "$clip_list" | fuzzel -d --prompt "> " --placeholder "Search clipboard..." --with-nth 2;}
 fzf_selector() { printf "%s" "$clip_list" | fzf; }
 
-# set fuzzel as default (if no option given)
-if [ $# -eq 0 ]; then
-    selection=$(fuzzel_selector)
-else
-    selection=""
-fi
+selector="fuzzel"
+type_mode=false
 
 # parse options
 while [ $# -gt 0 ]; do
     case "$1" in
         --fzf)
-            selection=$(fzf_selector)
-            break
+            selector="fzf"
+            shift
             ;;
         --fuzzel)
-            selection=$(fuzzel_selector)
-            break
+            selector="fuzzel"
+            shift
             ;;
+		-w)
+			type_mode=true
+			shift
+			;;
         *)
             echo "Unknown option: $1"
             echo "Usage: $0 [--fzf | --fuzzel]"
             exit 1
             ;;
-    esac
+	esac
 done
 
-# copy to clipboard
-echo "$selection" | cliphist decode | wl-copy --trim-newline
+if [ "$selector" = "fzf" ]; then
+    selection=$(fzf_selector)
+else
+    selection=$(fuzzel_selector)
+fi
+
+if [ "$type_mode" = true ]; then
+    echo "$selection" | cliphist decode | tr '\n' ' ' | rustype -
+else
+    echo "$selection" | cliphist decode | wl-copy --trim-newline
+fi
