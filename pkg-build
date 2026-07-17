@@ -9,7 +9,7 @@ end
 function __nvchecker
 	set -l PKGNAME $argv[1]
 	set -l PKGBUILD $argv[2]
-	
+
 	# if not configured in nvchecker, just return 0
 	if not string match -q "*[$PKGNAME]*" (cat "$XDG_CONFIG_HOME"/nvchecker/nvchecker.toml 2>/dev/null)
         return 0
@@ -23,7 +23,7 @@ function __nvchecker
         sed -i "s/^pkgver=.*/pkgver=$NEW_VER/" $PKGBUILD
         sed -i "s/^pkgrel=.*/pkgrel=1/" $PKGBUILD
         updpkgsums
-        
+
         nvtake "$PKGNAME"
 		return 0
 	end
@@ -32,8 +32,7 @@ end
 
 # -----------------------------------------------------
 
-set -l AUR_FORKS (find "$HOME/pkgs/aur-forks" -maxdepth 1 -mindepth 1 -type d 2>/dev/null)
-set -l CUSTOM_PKGS (find "$HOME/pkgs/custom" -maxdepth 1 -mindepth 1 -type d 2>/dev/null)
+set -l CUSTOM_PKGS (find "$HOME/pkgs" -maxdepth 1 -mindepth 1 -type d 2>/dev/null)
 set -l REPO "mine"
 
 set -x REVIEW_PAGER less
@@ -57,9 +56,9 @@ for pkg_dir in $CUSTOM_PKGS
 	end
 
     echo "~> processing: $pkg_name"
-    
+
 	pushd "$pkg_dir" >/dev/null
-	
+
 	if __nvchecker $pkg_name ./PKGBUILD
 		aur build -d $REPO --margs '-C,-s,-r,--cleanbuild' &| tee -a $LOG_FILE
 		if test $pipestatus[1] -ne 0
@@ -69,57 +68,6 @@ for pkg_dir in $CUSTOM_PKGS
 		end
 	else
 		echo "no update found for $pkg_name"
-	end
-
-	command rm -rf src pkg 2>/dev/null
-	popd >/dev/null
-end
-
-echo "--------------------------------------------------"
-echo "updating aur forks"
-for pkg_dir in $AUR_FORKS
-	set -l pkg_name (basename "$pkg_dir")
-
-	if not __confirm $pkg_name
-		echo "skipping $pkg_name"
-		continue
-	end
-
-	if not test -d "$pkg_dir"/.git
-		echo "$pkg_dir not a valid git repo"
-		continue
-	end
-
-	echo "~> processing: $pkg_name"
-	
-	set -l OLD_REV (git -C "$pkg_dir" rev-parse HEAD)
-	echo "running git pull --rebase"
-	if not git -C "$pkg_dir" pull --rebase &>>$LOG_FILE
-		echo "git rebase failed in $pkg_dir"
-		continue
-	end
-	set -l NEW_REV (git -C "$pkg_dir" rev-parse HEAD)
-	
-	pushd "$pkg_dir" >/dev/null
-	
-	if test $OLD_REV != $NEW_REV; or __nvchecker $pkg_name ./PKGBUILD
-		echo "--- reviewing PKGBUILD ---"
-		$REVIEW_PAGER PKGBUILD
-		
-		for install_file in (find . -maxdepth 1 \(-name "*.install" -o -name "*.hook"\) 2>/dev/null)
-			set -l file_name (basename $install_file)
-			echo "--- reviewing $file_name ---"
-			$REVIEW_PAGER $install_file
-		end
-		
-		aur build -d $REPO --margs '-C,-s,-r,--cleanbuild' &| tee -a $LOG_FILE
-		if test $pipestatus[1] -ne 0
-			echo "failed to build $pkg_name"
-		else
-			echo "added $pkg_name to local repo!"
-		end
-	else
-		echo "no upstream or nvchecker update for $pkg_name"
 	end
 
 	command rm -rf src pkg 2>/dev/null
