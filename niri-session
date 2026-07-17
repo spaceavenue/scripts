@@ -1,7 +1,7 @@
 #!/usr/bin/sh
 
-# update PATH to include local bin dir
-export PATH=$HOME/.local/bin:$PATH
+# update PATH to include local bin dir and programs within
+export PATH=$HOME/.local/bin/prog:$HOME/.local/bin:$PATH
 
 # set shell to fish since bash is login shell.
 # this *should* only really affect foot and can probably be set in niri itself
