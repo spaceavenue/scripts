@@ -33,4 +33,15 @@ function zl --wraps "z" --description "cd into a dir and list contents"
 end
 funcsave zl
 
+function rf --wraps "rg" --description "search and pipe output of rg into fzf"
+	rg --color=always --line-number --no-heading --smart-case $argv |
+		fzf --ansi \
+		  --color "hl:-1:underline,hl+:-1:underline:reverse" \
+		  --delimiter : \
+		  --preview 'bat --color=always {1} --highlight-line {2}' \
+		  --preview-window 'up,60%,border-bottom,+{2}+3/3,~3' \
+		  --bind 'enter:become(nvim {1} +{2})'
+end
+funcsave rf
+
 alias --save ytm-album="yt-dlp --format=\"ba[ext=m4a]\"/ba --extract-audio --audio-format m4a --no-overwrites --embed-metadata --embed-thumbnail --ppa \"ThumbnailsConvertor:-lavfi crop=ih:ih\" -o \"%(album)s/%(track_number,playlist_index)s %(title)s.%(ext)s\""

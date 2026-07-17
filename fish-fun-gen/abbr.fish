@@ -30,13 +30,19 @@ function fish_user_key_bindings
 	abbr -a lsblk 'lsblk -p -o NAME,FSTYPE,LABEL,FSUSE%,FSUSED,FSSIZE,MOUNTPOINTS'
 
 	# convenience
+	abbr -a gc   'git clone'
+	abbr -a gp	 'git push'
+	abbr -a gpl  'git pull'
+	abbr -a gplr 'git pull --rebase'
+	abbr -a gri	 'git rebase -i'
+
 	abbr -a b btop
 	abbr -a sb 'uwu btop'
 
 	abbr -a bt 'bluetoothctl connect'
 	abbr -a btdc 'bluetoothctl disconnect'
-	abbr -a wificon 'nmcli device wifi connect'
-	abbr -a wifilist 'nmcli device wifi list'
+	# abbr -a wificon 'nmcli device wifi connect'
+	# abbr -a wifilist 'nmcli device wifi list'
 
 	abbr -a usystemctl 'systemctl --user'
 	abbr -a ujournalctl 'journalctl --user'
