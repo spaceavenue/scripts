@@ -1,32 +1,9 @@
 #!/usr/bin/sh
 
-# update PATH to include local bin dir and programs within
-export PATH=$HOME/.local/bin/prog:$HOME/.local/bin:$PATH
-
-# set shell to fish since bash is login shell.
-# this *should* only really affect foot and can probably be set in niri itself
-# dont know if changing this is a bad idea. oh well. we'll see
-# export SHELL=/usr/bin/fish
-
-#set xdg variables
-export XDG_CONFIG_HOME="$HOME/.config"
-export XDG_CACHE_HOME="$HOME/.cache"
-export XDG_DATA_HOME="$HOME/.local/share"
-export XDG_STATE_HOME="$HOME/.local/state"
-
-#start niri
-
-# # if not running in login shel, run in login shell
-# if [ -n "$SHELL" ] &&
-#    grep -q "$SHELL" /etc/shells &&
-#    ! (echo "$SHELL" | grep -q "false") &&
-#    ! (echo "$SHELL" | grep -q "nologin"); then
-#   if [ "$1" != '-l' ]; then
-#     exec bash -c "exec -l '$SHELL' -c 'exec $0 -l $*'"
-#   else
-#     shift
-#   fi
-# fi
+# if not running in login shel, run in login shell
+if [ ${IS_LOGIN:-0} -ne 1 ]; then
+	exec fish -l -c "exec env IS_LOGIN=1 $0 $@"
+fi
 
 # Make sure there's no already running session.
 if systemctl --user -q is-active niri.service; then
@@ -57,4 +34,3 @@ systemctl --user start --job-mode=replace-irreversibly niri-shutdown.target
 # Unset environment that we've set.
 systemctl --user unset-environment WAYLAND_DISPLAY DISPLAY XDG_SESSION_TYPE XDG_CURRENT_DESKTOP NIRI_SOCKET
 
-# exec niri-session "$@" 2>/dev/null

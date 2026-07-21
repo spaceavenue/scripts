@@ -45,3 +45,12 @@ end
 funcsave rf
 
 alias --save ytm-album="yt-dlp --format=\"ba[ext=m4a]\"/ba --extract-audio --audio-format m4a --no-overwrites --embed-metadata --embed-thumbnail --ppa \"ThumbnailsConvertor:-lavfi crop=ih:ih\" -o \"%(album)s/%(track_number,playlist_index)s %(title)s.%(ext)s\""
+
+function crop_thumb
+	mkdir -p tmp_out
+    for file in *.m4a
+		ffmpeg -i "$file" -map_metadata 0 -vf "crop=720:720" -c:v mjpeg -disposition:v attached_pic -c:a copy "tmp_out/$file" && mv "tmp_out/$file" "$file"
+    end
+    rmdir tmp_out
+end
+funcsave crop_thumb

@@ -11,8 +11,14 @@ set_wallpaper() {
 
     ln -sf $WALLDIR/$WALL $HOME/.config/current_wallpaper
     ln -sf $WALLDIR/blurred/$WALL $HOME/.config/current_wallpaper_blurred
-    killall rustbg 
-    ~/.local/bin/setwall
+
+	prev_pids=($(pidof rustbg)) 
+    
+	~/.local/bin/setwall && sleep 0.2
+
+	if [ ${#prev_pids[@]} -gt 0 ]; then
+		kill "${prev_pids[@]}" 2>/dev/null
+	fi
 }
 
 while true; do

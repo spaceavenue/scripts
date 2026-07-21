@@ -1,5 +1,7 @@
 #!/usr/bin/env fish
 
+fish_add_path "$HOME"/.local/bin/prog "$HOME"/.local/bin
+
 function fish_greeting
 end
 funcsave fish_greeting
@@ -18,13 +20,13 @@ function fish_prompt
     echo -n $USER
     
     set_color normal cba6f7
-    echo -n '@'
+    echo -n ' on '
     
     set_color normal ffd1db --bold
     echo -n (prompt_hostname)
     
     set_color normal cba6f7
-    echo -n ' '(prompt_pwd)
+    echo -n ' in '(prompt_pwd)
 
     set -g __fish_git_prompt_showcolorfeatures true
     set -g __fish_git_prompt_color_branch f38ba8 --bold

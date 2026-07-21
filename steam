@@ -1,3 +1,5 @@
 #!/usr/bin/bash
 export DISPLAY=:0
-HOME=$HOME/.local/share/Steam/steam-home exec /usr/bin/steam "$@"
+export HOME=$HOME/.local/share/Steam/steam-home
+
+exec /usr/bin/steam "$@"

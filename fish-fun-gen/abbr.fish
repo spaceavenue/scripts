@@ -4,7 +4,7 @@ function fish_user_key_bindings
 	abbr -a pari 'paru -Si'   # aur package info
 	abbr -a psize 'paru -Ps' # system package size
 	
-	abbr -a kill-orphans 'pacman -Qdtq | doas pacman -Rns -- -'  # remove orphans
+	abbr -a kill-orphans 'pacman -Qdtq | run0 pacman -Rns -- -'  # remove orphans
 
 	# sudo -> uwu (which is just run0 lmao)
 	abbr -a sudo uwu

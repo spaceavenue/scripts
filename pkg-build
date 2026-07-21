@@ -6,28 +6,45 @@ function __confirm
 	string match -qi 'y*' "$reply"
 end
 
-function __nvchecker
+# checks if we track the package via nvchecker
+function __tracked
 	set -l PKGNAME $argv[1]
-	set -l PKGBUILD $argv[2]
+	string match -q "*[$PKGNAME]*" (cat "$XDG_CONFIG_HOME"/nvchecker/nvchecker.toml 2>/dev/null)
+end
 
-	# if not configured in nvchecker, just return 0
-	if not string match -q "*[$PKGNAME]*" (cat "$XDG_CONFIG_HOME"/nvchecker/nvchecker.toml 2>/dev/null)
-        return 0
-    end
+# checks if there is an update, no updates, no prompt, gets skipped
+function __has_update
+	set -l PKGNAME $argv[1]
+	set -l NVCMP_OUT $argv[2..-1]
 
-	set -l match (nvcmp 2>/dev/null | string match -r "^$PKGNAME\s+\S+\s+->\s+(\S+)")
-    if test (count $match) -ge 2
-		set -l NEW_VER $match[2]
-        echo "new version for $PKGNAME: $NEW_VER"
-        
-        sed -i "s/^pkgver=.*/pkgver=$NEW_VER/" $PKGBUILD
-        sed -i "s/^pkgrel=.*/pkgrel=1/" $PKGBUILD
-        updpkgsums
-
-        nvtake "$PKGNAME"
+	if not __tracked $PKGNAME
 		return 0
 	end
-	return 1
+
+	string match -qr "^$PKGNAME\s+\S+\s+(?:->|\+\+)\s+(\S+)" -- $NVCMP_OUT
+end
+
+# bumps version in PKGBUILD but no nvtake.
+# so if a build fails, we can still build the package later via the script
+function __apply_update
+	set -l PKGNAME $argv[1]
+	set -l PKGBUILD $argv[2]
+	set -l NVCMP_OUT $argv[3..-1]
+
+	if not __tracked $PKGNAME
+		echo "not in nvchecker"
+		return
+	end
+
+	set -l match (string match -r "^$PKGNAME\s+\S+\s+(?:->|\+\+)\s+(\S+)" -- $NVCMP_OUT)
+	if test (count $match) -ge 2
+		set -l NEW_VER $match[2]
+		echo "new version for $PKGNAME: $NEW_VER"
+
+		sed -i "s/^pkgver=.*/pkgver=$NEW_VER/" $PKGBUILD
+		sed -i "s/^pkgrel=.*/pkgrel=1/" $PKGBUILD
+		updpkgsums
+	end
 end
 
 # -----------------------------------------------------
@@ -45,10 +62,17 @@ end
 set -l LOG_FILE "$XDG_STATE_HOME/pkg-build.log"
 nvchecker
 
+set -l NVCMP_OUT (nvcmp 2>/dev/null)
+
 echo "--------------------------------------------------"
 echo "updating our packgages"
 for pkg_dir in $CUSTOM_PKGS
     set -l pkg_name (basename "$pkg_dir")
+
+	if not __has_update $pkg_name $NVCMP_OUT
+		echo "no update found for $pkg_name, skipping"
+		continue
+	end
 
 	if not __confirm $pkg_name
 		echo "skipping $pkg_name"
@@ -59,15 +83,14 @@ for pkg_dir in $CUSTOM_PKGS
 
 	pushd "$pkg_dir" >/dev/null
 
-	if __nvchecker $pkg_name ./PKGBUILD
-		aur build -d $REPO --margs '-C,-s,-r,--cleanbuild' &| tee -a $LOG_FILE
-		if test $pipestatus[1] -ne 0
-			echo "failed to build $pkg_name"
-		else
-			echo "added $pkg_name to local repo!"
-		end
+	__apply_update $pkg_name ./PKGBUILD $NVCMP_OUT
+
+	aur build -d $REPO --margs '-C,-s,-r,--cleanbuild' &| tee -a $LOG_FILE
+	if test $pipestatus[1] -ne 0
+		echo "failed to build $pkg_name"
 	else
-		echo "no update found for $pkg_name"
+		echo "added $pkg_name to local repo!"
+		__tracked $pkg_name; and nvtake "$pkg_name"
 	end
 
 	command rm -rf src pkg 2>/dev/null
@@ -75,5 +98,5 @@ for pkg_dir in $CUSTOM_PKGS
 end
 
 echo "--------------------------------------------------"
-echo "updating standard AUR packages"
+echo "updating AUR packages"
 aur sync -u -d $REPO
