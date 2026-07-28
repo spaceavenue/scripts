@@ -8,7 +8,7 @@ font="Iosevka Etoile:size=16"
 # parse list
 if [ ! -f $parsed_list ]; then
     curl -s $list_url \
-    | awk -F'# ' '/; fully-qualified/ {gsub(/E[0-9.]* /, ""); print $2}' 
+    | awk -F'# ' '/; fully-qualified/ {gsub(/E[0-9.]* /, ""); print $2}' \
     > $parsed_list
 fi
 
