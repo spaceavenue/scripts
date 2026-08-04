@@ -21,7 +21,7 @@ function __has_update
 		return 0
 	end
 
-	string match -qr "^$PKGNAME\s+\S+\s+(?:->|\+\+)\s+(\S+)" -- $NVCMP_OUT
+	string match -qr "^$PKGNAME\s+\S+\s+(?:->|<-|\+\+)\s+(\S+)" -- $NVCMP_OUT
 end
 
 # bumps version in PKGBUILD but no nvtake.
@@ -49,7 +49,8 @@ end
 
 # -----------------------------------------------------
 
-set -l CUSTOM_PKGS (find "$HOME/pkgs" -maxdepth 1 -mindepth 1 -type d 2>/dev/null)
+set -l CUSTOM_PKGS (find "$HOME/pkg" -maxdepth 1 -mindepth 1 -type d 2>/dev/null)
+set -l EXCLUDED_PKGS better-utils .git
 set -l REPO "mine"
 
 set -x REVIEW_PAGER less
@@ -69,6 +70,10 @@ echo "updating our packgages"
 for pkg_dir in $CUSTOM_PKGS
     set -l pkg_name (basename "$pkg_dir")
 
+    if contains -- $pkg_name $EXCLUDED_PKGS
+        continue
+    end
+
 	if not __has_update $pkg_name $NVCMP_OUT
 		echo "no update found for $pkg_name, skipping"
 		continue
@@ -85,7 +90,7 @@ for pkg_dir in $CUSTOM_PKGS
 
 	__apply_update $pkg_name ./PKGBUILD $NVCMP_OUT
 
-	aur build -d $REPO --margs '-C,-s,-r,--cleanbuild' &| tee -a $LOG_FILE
+	aur build -f -d $REPO --margs '-C,-s,-r,--cleanbuild' &| tee -a $LOG_FILE
 	if test $pipestatus[1] -ne 0
 		echo "failed to build $pkg_name"
 	else
