@@ -52,7 +52,7 @@ fi
 [ -z "$selection" ] && exit 0
 
 if [ "$type_mode" = true ]; then
-	echo "$selection" | cut -d' ' -f1 | tr '\n' ' ' | rustype -
+	echo "$selection" | cut -d' ' -f1 | tr '\n' ' ' | wtype -
 else
     echo "$selection" | cut -d' ' -f1 | wl-copy --trim-newline
 fi
