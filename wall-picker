@@ -2,18 +2,24 @@
 
 # wallpaper directory
 WALLDIR="$HOME/media/Wallpapers"
+# extensions for wallpapers. png for blurred because swaylock
+EXT="qoz"
+EXT_BLUR="png"
 
 set_wallpaper() {
-    WALL="$1"
-    if [ ! -f $WALLDIR/blurred/$WALL ]; then
-        rustblur 3 3.0 $WALLDIR/$WALL $WALLDIR/blurred/$WALL
+	# gets the name without the extension
+	WALL=${1%.*}
+    if [ ! -f $WALLDIR/blurred/$WALL.$EXT_BLUR ]; then
+        rustblur 3 3.0 $WALLDIR/$WALL.$EXT $WALLDIR/blurred/$WALL.$EXT_BLUR
     fi
 
-    ln -sf $WALLDIR/$WALL $HOME/.config/current_wallpaper
-    ln -sf $WALLDIR/blurred/$WALL $HOME/.config/current_wallpaper_blurred
+	ln -sf "$WALLDIR/$WALL.$EXT" $HOME/.config/current_wallpaper
+	ln -sf "$WALLDIR/blurred/$WALL.$EXT_BLUR" $HOME/.config/current_wallpaper_blurred
 
-	prev_pids=($(pidof rustbg)) 
-    
+	# for a smoother "transition",
+	# get the current pids of all rustbg processes, start the new processes and kill the previous ones
+	prev_pids=($(pidof rustbg))
+
 	~/.local/bin/setwall && sleep 0.2
 
 	if [ ${#prev_pids[@]} -gt 0 ]; then
@@ -22,7 +28,7 @@ set_wallpaper() {
 }
 
 while true; do
-    WALL=$(ls -I "blurred" -I "phone" "$WALLDIR" | fuzzel --dmenu --prompt "Wallpaper > ")
+    WALL=$(ls -1 -I "blurred" -I "qoi" "$WALLDIR" | sed -e 's/\..*$//' | fuzzel --dmenu --prompt "Wallpaper > ")
     [ -z "$WALL" ] && exit 0
     set_wallpaper "$WALL"
     exit 0
