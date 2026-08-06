@@ -50,7 +50,7 @@ end
 # -----------------------------------------------------
 
 set -l CUSTOM_PKGS (find "$HOME/pkg" -maxdepth 1 -mindepth 1 -type d 2>/dev/null)
-set -l EXCLUDED_PKGS better-utils .git
+set -l EXCLUDED_PKGS .git
 set -l REPO "mine"
 
 set -x REVIEW_PAGER less

@@ -1,7 +1,7 @@
 #!/usr/bin/sh
 
 # wallpaper directory
-WALLDIR="$HOME/media/Wallpapers"
+WALLDIR="$HOME/mia/wal"
 # extensions for wallpapers. png for blurred because swaylock
 EXT="qoz"
 EXT_BLUR="png"
