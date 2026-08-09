@@ -28,7 +28,7 @@ set_wallpaper() {
 }
 
 while true; do
-    WALL=$(ls -1 -I "blurred" -I "qoi" "$WALLDIR" | sed -e 's/\..*$//' | fuzzel --dmenu --prompt "Wallpaper > ")
+    WALL=$(ls -1 -I "blurred" -I "orig" "$WALLDIR" | sed -e 's/\..*$//' | fuzzel --dmenu --prompt "Wallpaper > ")
     [ -z "$WALL" ] && exit 0
     set_wallpaper "$WALL"
     exit 0
