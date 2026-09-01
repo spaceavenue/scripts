@@ -1,3 +1,0 @@
-#!/usr/bin/sh
-niri msg action spawn -- "rustbg" "-f" "$HOME/.config/current_wallpaper"
-niri msg action spawn -- "rustbg" "-f" "-n" "wallpaper-overview" "$HOME/.config/current_wallpaper_blurred"

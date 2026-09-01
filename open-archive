@@ -6,18 +6,14 @@ if test (count $argv) -eq 0
 end
 
 set ARCHIVE_PATH $argv[1]
-
-set ARCHIVE_NAME (basename $ARCHIVE_PATH)
-
-set FOLDER_NAME (string replace -r -i '\.(zip|7z|rar|tar\.gz|tgz|tar\.bz2|tar\.xz|tar)$' '' $ARCHIVE_NAME)
-
+set ARCHIVE_NAME (path basename -E $ARCHIVE_PATH)
 set TMP_ROOT (mktemp -d /tmp/archive_XXXXXX)
+set TARGET_DIR "$TMP_ROOT/$ARCHIVE_NAME"
 
-set TARGET_DIR "$TMP_ROOT/$FOLDER_NAME"
 mkdir -p $TARGET_DIR
 
-7z x $ARCHIVE_PATH -o$TARGET_DIR
+ouch decompress $ARCHIVE_PATH --dir $TARGET_DIR
 
-footclient yazi $TARGET_DIR
+foot yazi $TARGET_DIR
 
 rm -rf $TMP_ROOT

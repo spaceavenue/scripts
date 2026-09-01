@@ -2,7 +2,11 @@
 
 function __confirm
 	set -l pkg_name $argv[1]
+
+  set_color f38ba8
 	read -P "build '$pkg_name'? [y/N]: " -l reply
+  set_color normal
+
 	string match -qi 'y*' "$reply"
 end
 
@@ -32,14 +36,21 @@ function __apply_update
 	set -l NVCMP_OUT $argv[3..-1]
 
 	if not __tracked $PKGNAME
+
+    set_color cba6f7
 		echo "not in nvchecker"
-		return
+    set_color normal
+	
+    return
 	end
 
 	set -l match (string match -r "^$PKGNAME\s+\S+\s+(?:->|\+\+)\s+(\S+)" -- $NVCMP_OUT)
 	if test (count $match) -ge 2
 		set -l NEW_VER $match[2]
+    
+    set_color f38ba8
 		echo "new version for $PKGNAME: $NEW_VER"
+    set_color normal
 
 		sed -i "s/^pkgver=.*/pkgver=$NEW_VER/" $PKGBUILD
 		sed -i "s/^pkgrel=.*/pkgrel=1/" $PKGBUILD
@@ -50,23 +61,22 @@ end
 # -----------------------------------------------------
 
 set -l CUSTOM_PKGS (find "$HOME/pkg" -maxdepth 1 -mindepth 1 -type d 2>/dev/null)
-set -l EXCLUDED_PKGS .git
+set -l EXCLUDED_PKGS .git ttf-ibm-plex-custom
 set -l REPO "mine"
-
-set -x REVIEW_PAGER less
-if type -q bat
-	set -x REVIEW_PAGER "bat --paging=always --language=PBD"
-else if set -q PAGER
-    set -x REVIEW_PAGER $PAGER
-end
-
 set -l LOG_FILE "$XDG_STATE_HOME/pkg-build.log"
+
 nvchecker
 
 set -l NVCMP_OUT (nvcmp 2>/dev/null)
 
+set_color 89b4fa
 echo "--------------------------------------------------"
+set_color normal
+
+set_color --bold ffd1db
 echo "updating our packgages"
+set_color normal
+
 for pkg_dir in $CUSTOM_PKGS
     set -l pkg_name (basename "$pkg_dir")
 
@@ -75,16 +85,26 @@ for pkg_dir in $CUSTOM_PKGS
     end
 
 	if not __has_update $pkg_name $NVCMP_OUT
-		echo "no update found for $pkg_name, skipping"
-		continue
+
+		set_color cba6f7
+    echo "no update found for $pkg_name, skipping"
+    set_color normal
+
+    continue
 	end
 
 	if not __confirm $pkg_name
-		echo "skipping $pkg_name"
+
+		set_color cba6f7
+    echo "skipping $pkg_name"
+    set_color normal
+
 		continue
 	end
 
-    echo "~> processing: $pkg_name"
+  set_color ffabab
+  echo "~> processing: $pkg_name"
+  set_color normal
 
 	pushd "$pkg_dir" >/dev/null
 
@@ -92,16 +112,30 @@ for pkg_dir in $CUSTOM_PKGS
 
 	aur build -f -d $REPO --margs '-C,-s,-r,--cleanbuild' &| tee -a $LOG_FILE
 	if test $pipestatus[1] -ne 0
-		echo "failed to build $pkg_name"
+
+		set_color f38ba8
+    echo "failed to build $pkg_name"
+    set_color normal
+
 	else
-		echo "added $pkg_name to local repo!"
-		__tracked $pkg_name; and nvtake "$pkg_name"
+
+		set_color ffd1db
+    echo "added $pkg_name to local repo!"
+		set_color normal
+
+    __tracked $pkg_name; and nvtake "$pkg_name"
 	end
 
 	command rm -rf src pkg 2>/dev/null
 	popd >/dev/null
 end
 
+set_color 89b4fa
 echo "--------------------------------------------------"
+set_color normal
+
+set_color --bold ffd1db
 echo "updating AUR packages"
+set_color normal
+
 aur sync -u -d $REPO
