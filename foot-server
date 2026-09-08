@@ -1,7 +1,0 @@
-#!/usr/bin/env sh
-
-if pgrep -x "foot"; then
-    pkill --signal SIGTERM foot
-fi
-
-exec foot --server
