@@ -1,0 +1,187 @@
+#!/usr/bin/env fish
+
+set -l mode ""
+
+# emoji, glyph, and symbol specific
+set -l cache_dir (set -q XDG_CACHE_HOME; and echo $XDG_CACHE_HOME; or echo ~/.cache)
+set -l emoji_list_file "$cache_dir/emoji-list"
+set -l glyph_list_file "$cache_dir/glyph-list"
+set -l symbol_list_file "$cache_dir/symbol-list"
+
+# wallpaper specific
+set -l walldir "$HOME/mia/wal"
+set -l blur_walldir "$HOME/mia/wal/blurred"
+set -l ext qoz
+set -l ext_blur png
+set -l wall_link "$XDG_CONFIG_HOME/current_wallpaper"
+set -l blur_wall_link "$XDG_CONFIG_HOME/current_wallpaper_blurred"
+
+if test (count $argv) -gt 0; and not string match -q -- "-*" "$argv[1]"
+    set mode "$argv[1]"
+    set -e argv[1]
+end
+
+argparse h/help fzf wtype nline -- $argv
+or exit 1
+
+if set -q _flag_help
+    echo "usage: pick [clip|color|emoji|glyph|symbol|wall] [OPTIONS]"
+    echo ""
+    echo "a unified picker"
+    echo ""
+    echo "subcommands:"
+    echo "  clip                pick from clipboard history"
+    echo "  color               pick a color"
+    echo "  emoji               pick an emoji"
+    echo "  glyph               pick a nerd font glyph"
+    echo "  symbol              pick a unicode symbol"
+    echo "  wall                pick and apply a wallpaper"
+    echo ""
+    echo "options:"
+    echo "  -h, --help          show this help message"
+    echo "  --wtype             type output via wtype"
+    echo "  --nline             preserve newlines when using wtype (clip mode)"
+    echo "  --fzf               use fzf instead of fuzzel"
+    exit 0
+end
+
+# selection helper
+function _select --no-scope-shadowing
+    set -l prompt $argv[1]
+    set -l placeholder $argv[2]
+    set -l font $argv[3]
+    set -l extra_args $argv[4..-1]
+
+    if set -q _flag_fzf
+        fzf
+    else
+        set -l cmd fuzzel --dmenu --prompt "$prompt "
+        test -n "$placeholder"; and set cmd $cmd --placeholder "$placeholder"
+        test -n "$font"; and set cmd $cmd --font "$font"
+        test (count $extra_args) -gt 0; and set cmd $cmd $extra_args
+        $cmd
+    end
+end
+
+# output helper
+function _output --no-scope-shadowing
+    set -l text $argv[1]
+    test -z "$text"; and return 0
+
+    if set -q _flag_wtype
+        if not set -q _flag_nline
+            set text (string replace -a \n ' ' "$text")
+        end
+        printf "%s" "$text" | wtype -
+    else
+        printf "%s" "$text" | wl-copy --trim-newline
+    end
+end
+
+# show menu if mode was not passed
+if test -z "$mode"
+    set -l options \
+        "clip: pick from clipboard history" \
+        "color: pick a color" \
+        "emoji: pick an emoji" \
+        "glyph: pick a nerd font glyph" \
+        "symbol: pick a unicode symbol" \
+        "wall: pick a wallpaper"
+    set -l choice (printf "%s\n" $options | _select "Picker >")
+    test -z "$choice"; and exit 0
+    set mode (string split -f1 ":" "$choice")
+end
+
+# dispatcher
+switch "$mode"
+    case clip
+        set -l selection (cliphist list | _select ">" "Search clipboard..." "" --with-nth 2)
+        test -z "$selection"; and exit 0
+        set -l decoded (echo "$selection" | cliphist decode | string collect)
+        _output "$decoded"
+
+    case color
+        set -l raw (niri msg pick-color 2>&1)
+        set -l color (echo "$raw" | string match -r '#[0-9a-fA-F]{6}')
+        test -z "$color"; and exit 0
+        wl-copy -n "$color"
+        notify-send -a "Color Picker" "Color $color copied to clipboard"
+
+    case emoji
+        if not test -f "$emoji_list_file"
+            mkdir -p "$cache_dir"
+            curl -s "https://www.unicode.org/Public/17.0.0/emoji/emoji-test.txt" \
+                | awk -F'# ' '/; fully-qualified/ {gsub(/E[0-9.]* /, ""); print $2}' >"$emoji_list_file"
+        end
+        set -l selection (_select ">" "Search emojis..." "Iosevka Etoile:size=16" < "$emoji_list_file")
+        test -z "$selection"; and exit 0
+        set -l symbol (echo "$selection" | string split -f1 ' ')
+        _output "$symbol"
+
+    case glyph
+        if not test -f "$glyph_list_file"
+            mkdir -p "$cache_dir"
+            curl -s "https://raw.githubusercontent.com/ryanoasis/nerd-fonts/master/css/nerd-fonts-generated.css" \
+                | awk '/:before/ { gsub(/^\.nf-|:before/, "", $1); name=$1 } 
+                   /content:/ { gsub(/[^0-9a-fA-F]/, "", $2); 
+                   printf("%c %s\n", strtonum("0x" $2), name) }' >"$glyph_list_file"
+        end
+        set -l selection (_select ">" "Search glyphs..." "Symbols Nerd Font:size=16" < "$glyph_list_file")
+        test -z "$selection"; and exit 0
+        set -l symbol (echo "$selection" | string split -f1 ' ')
+        _output "$symbol"
+
+    case symbol
+        if not test -f "$symbol_list_file"
+            mkdir -p "$cache_dir"
+            python3 -c '
+import unicodedata
+
+# S = Symbols (Math, Currency, Modifier, Other)
+# P = Punctuation (Dashes, Quotes, Bullets, Section signs)
+# No, Nl = Numbers (Superscripts, Subscripts, Fractions, Roman numerals)
+# 0x0370..0x03FF = Greek and Coptic (standard mathematical variables)
+for cp in range(0x110000):
+    ch = chr(cp)
+    try:
+        cat = unicodedata.category(ch)
+        if cat[0] in ("S", "P") or cat in ("No", "Nl") or (0x0370 <= cp <= 0x03FF):
+            name = unicodedata.name(ch)
+            print(f"{ch} {name}")
+    except (ValueError, KeyError):
+        continue
+' > "$symbol_list_file"
+        end
+        # Leaving font blank lets fuzzel use system fallback fonts for broad coverage
+        set -l selection (_select ">" "Search symbols..." "" < "$symbol_list_file")
+        test -z "$selection"; and exit 0
+        set -l symbol (echo "$selection" | string split -f1 ' ')
+        _output "$symbol"
+
+    case wall
+        set -l wall (
+            find $walldir -maxdepth 1 -type f 2>/dev/null \
+                | sort \
+                | path basename -E \
+                | _select "Wallpaper >"
+            )
+        test -z "$wall"; and exit 0
+
+        if not test -f "$blur_walldir/$wall.$ext_blur"
+            rustblur 3 3.0 "$walldir/$wall.$ext" "$blur_walldir/$wall.$ext_blur"
+        end
+
+        ln -sf "$walldir/$wall.$ext" "$wall_link"
+        ln -sf "$blur_walldir/$wall.$ext_blur" "$blur_wall_link"
+
+        set -l prev_pids (pidof rustbg | string split ' ')
+        niri msg action spawn -- rustbg -f "$wall_link"
+        niri msg action spawn -- rustbg -f -n wallpaper-overview "$blur_wall_link"
+        sleep 0.15
+        test -n "$prev_pids"; and kill $prev_pids
+
+    case '*'
+        echo "unknown mode: '$mode'" >&2
+        echo "run 'pick --help' for available modes" >&2
+        exit 1
+end
