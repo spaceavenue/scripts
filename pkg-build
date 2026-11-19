@@ -1,151 +1,108 @@
 #!/usr/bin/env fish
 
-function __confirm
-    set -l pkg_name $argv[1]
-
-    set_color f38ba8
-    read -P "build '$pkg_name'? [y/N]: " -l reply
+function __say
+    set_color $argv[1]
+    echo $argv[2..-1]
     set_color normal
+end
 
+function __section
+    __say 89b4fa --------------------------------------------------
+    set_color --bold ffd1db
+    echo $argv
+    set_color normal
+end
+
+function __confirm
+    set_color f38ba8
+    read -P "build '$argv[1]'? [y/N]: " -l reply
+    set_color normal
     string match -qi 'y*' "$reply"
 end
 
-# checks if we track the package via nvchecker
+# do we track this?
 function __tracked
-    set -l PKGNAME $argv[1]
-    string match -q "*[$PKGNAME]*" (cat "$XDG_CONFIG_HOME"/nvchecker/nvchecker.toml 2>/dev/null)
+    grep -qF "[$argv[1]]" "$XDG_CONFIG_HOME/nvchecker/nvchecker.toml" 2>/dev/null
 end
 
-# checks if there is an update, no updates, no prompt, gets skipped
-function __has_update
-    set -l PKGNAME $argv[1]
-    set -l NVCMP_OUT $argv[2..-1]
-
-    if not __tracked $PKGNAME
-        return 0
-    end
-
-    string match -qr "^$PKGNAME\s+\S+\s+(?:->|<-|\+\+)\s+(\S+)" -- $NVCMP_OUT
+# print upstream version if nvcmp reports update
+function __new_version
+    set -l pat (string escape --style=regex $argv[1])
+    string match -rg "^$pat\s+\S+\s+(?:->|<-|\+\+)\s+(\S+)" -- $argv[2..-1]
 end
 
-# bumps version in PKGBUILD but no nvtake.
-# so if a build fails, we can still build the package later via the script
+# bumps PKGBUILD but no nvtake.
 function __apply_update
-    set -l PKGNAME $argv[1]
-    set -l PKGBUILD $argv[2]
-    set -l NVCMP_OUT $argv[3..-1]
+    __say f38ba8 "new version for $argv[1]: $argv[2]"
 
-    if not __tracked $PKGNAME
-
-        set_color cba6f7
-        echo "not in nvchecker"
-        set_color normal
-
-        return
-    end
-
-    set -l match (string match -r "^$PKGNAME\s+\S+\s+(?:->|<-|\+\+)\s+(\S+)" -- $NVCMP_OUT)
-    if test (count $match) -ge 2
-        set -l NEW_VER $match[2]
-
-        set_color f38ba8
-        echo "new version for $PKGNAME: $NEW_VER"
-        set_color normal
-
-        sed -i "s/^pkgver=.*/pkgver=$NEW_VER/" $PKGBUILD
-        sed -i "s/^pkgrel=.*/pkgrel=1/" $PKGBUILD
-        updpkgsums
-    end
+    # pkgver can't contain hyphens
+    set -l ver (string replace -a - _ -- $argv[2])
+    sed -i -e "s/^pkgver=.*/pkgver=$ver/" -e 's/^pkgrel=.*/pkgrel=1/' PKGBUILD
+    updpkgsums
 end
 
 # -----------------------------------------------------
 
-set -l CUSTOM_PKGS (find "$HOME/pkg" -maxdepth 1 -mindepth 1 -type d 2>/dev/null)
-set -l EXCLUDED_PKGS .git ttf-ibm-plex-custom obsidian-custom signal-desktop-custom vesktop-custom clang-gccless
+set -l PKG_ROOT "$XDG_CONFIG_HOME/pkg"
+set -l EXCLUDED_PKGS ttf-ibm-plex-custom obsidian-custom signal-desktop-custom vesktop-custom clang-gccless
 set -l REPO mine
+set -l REPO_DIR /var/local/mine
 set -l LOG_FILE "$XDG_STATE_HOME/pkg-build.log"
+set -l failed
 
 nvchecker
+set -l nvcmp_out (nvcmp 2>/dev/null)
 
-set -l NVCMP_OUT (nvcmp 2>/dev/null)
+__section "updating our packages"
 
-set_color 89b4fa
-echo --------------------------------------------------
-set_color normal
+for pkg_dir in (path filter -d $PKG_ROOT/*)
+    set -l pkg (path basename $pkg_dir)
 
-set_color --bold ffd1db
-echo "updating our packgages"
-set_color normal
+    contains -- $pkg $EXCLUDED_PKGS; and continue
 
-for pkg_dir in $CUSTOM_PKGS
-    set -l pkg_name (basename "$pkg_dir")
+    # tracked packages w/o updates skip silently (noisy). untracked ones always prompt
+    set -l new_ver
+    if __tracked $pkg
+        set new_ver (__new_version $pkg $nvcmp_out)
+        if test -z "$new_ver"
+            # __say cba6f7 "no update found for $pkg, skipping"
+            continue
+        end
+    end
 
-    if contains -- $pkg_name $EXCLUDED_PKGS
+    if not __confirm $pkg
+        __say cba6f7 "skipping $pkg"
         continue
     end
 
-    if not __has_update $pkg_name $NVCMP_OUT
+    __say ffabab "~> processing: $pkg"
+    cd $pkg_dir; or continue
 
-        set_color cba6f7
-        echo "no update found for $pkg_name, skipping"
-        set_color normal
-
-        continue
-    end
-
-    if not __confirm $pkg_name
-
-        set_color cba6f7
-        echo "skipping $pkg_name"
-        set_color normal
-
-        continue
-    end
-
-    set_color ffabab
-    echo "~> processing: $pkg_name"
-    set_color normal
-
-    pushd "$pkg_dir" >/dev/null
-
-    __apply_update $pkg_name ./PKGBUILD $NVCMP_OUT
-
-    aur build -f -d $REPO --margs '-C,-s,-r,--cleanbuild' &| tee -a $LOG_FILE
-    if test $pipestatus[1] -ne 0
-
-        set_color f38ba8
-        echo "failed to build $pkg_name"
-        set_color normal
-
+    if test -n "$new_ver"
+        __apply_update $pkg $new_ver
     else
+        __say cba6f7 "not in nvchecker"
+    end
 
-        set_color ffd1db
-        echo "added $pkg_name to local repo!"
-        set_color normal
-
-        __tracked $pkg_name; and nvtake "$pkg_name"
+    aur build -f -d $REPO --margs '-C,-s,-r' &| tee -a $LOG_FILE
+    if test $pipestatus[1] -ne 0
+        __say f38ba8 "failed to build $pkg :("
+        set -a failed $pkg
+    else
+        __say ffd1db "added $pkg to local repo!"
+        test -n "$new_ver"; and nvtake $pkg
     end
 
     command rm -rf src pkg 2>/dev/null
-    popd >/dev/null
 end
 
-set_color 89b4fa
-echo --------------------------------------------------
-set_color normal
-
-set_color --bold ffd1db
-echo "updating AUR packages"
-set_color normal
-
+__section "updating AUR packages"
 aur sync -u -d $REPO
 
-set_color 89b4fa
-echo --------------------------------------------------
-set_color normal
+__section "removing old packages in [$REPO]"
+paccache -c $REPO_DIR -rk1
 
-set_color --bold ffd1db
-echo "removing old packages in [$REPO]"
-set_color normal
-
-paccache -c /var/local/mine -rk1
+if set -q failed[1]
+    __say f38ba8 "failed to build: $failed"
+    exit 1
+end
